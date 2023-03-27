@@ -641,14 +641,6 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			configJsonValue, err := parseJsonConfig(rawJsonArgs)
-			if err != nil {
-				return err
-			} 
-			err = setConfigFromJsonValue(ps,configJsonValue)
-			if err != nil {
-				return err
-			}
 		
 			for _, ptArg := range plaintextArgs {
 				key, value, err := parseKeyValuePair(ptArg)
@@ -683,6 +675,20 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 					return err
 				}
 			}
+            
+			if rawJsonArgs != "" {
+				configJsonValue, err := parseJsonConfig(rawJsonArgs)
+				
+				if err != nil {
+					return err
+				} 
+			
+				err = setConfigFromJsonValue(ctx,stack,ps,configJsonValue)
+				if err != nil {
+					return err
+				}
+				
+			}
 
 			return saveProjectStack(stack, ps)
 		}),
@@ -713,11 +719,27 @@ func parseJsonConfig(jsonConfig string) (map[string]configValueJSON,error){
 	return config,nil
 }
 
-func setKeyValuePairFromJson(ps *workspace.ProjectStack,key config.Key,jsonValue *configValueJSON)(error){
+func encryptValue(ctx context.Context, stack backend.Stack,value string)(string,error){
+	c, cerr := getStackEncrypter(stack)
+				if cerr != nil {
+					return "",cerr
+				}
+				enc, eerr := c.EncryptValue(ctx, value)
+				if eerr != nil {
+					return "",eerr
+				}
+				return enc,nil
+}
+
+func setKeyValuePairFromJson(ctx context.Context, stack backend.Stack,ps *workspace.ProjectStack,key config.Key,jsonValue configValueJSON)(error){
 	var value config.Value 
 	if jsonValue.ObjectValue != nil {
 		if jsonValue.Secret {
-            value = config.NewSecureObjectValue(*jsonValue.Value)	
+			enc,err := encryptValue(ctx,stack,*jsonValue.Value)
+			if err != nil {
+				return err
+			}
+            value = config.NewSecureObjectValue(enc)	
 		}else{
 			value = config.NewObjectValue(*jsonValue.Value)
 		}
@@ -729,25 +751,32 @@ func setKeyValuePairFromJson(ps *workspace.ProjectStack,key config.Key,jsonValue
 	}
 	
 	if jsonValue.Secret {
-		value = config.NewSecureValue(*jsonValue.Value)
+		enc,err := encryptValue(ctx,stack,*jsonValue.Value)
+			if err != nil {
+				return err
+			}
+	    value = config.NewSecureValue(enc)
 	}else{
 		value = config.NewValue(*jsonValue.Value)
 	}
-
 	err := ps.Config.Set(key,value,false)
 	if err != nil {
-			return err
+		return err
 	}
 	return nil
 }
 
-func setConfigFromJsonValue(ps *workspace.ProjectStack,jsonValues map[string]configValueJSON) (error){
+func setConfigFromJsonValue(ctx context.Context, stack backend.Stack,ps *workspace.ProjectStack,jsonValues map[string]configValueJSON) (error){
 	for keyName, element := range jsonValues {
+		if element.Value == nil {
+			return fmt.Errorf("invalid json input, all config entries must have values")
+		}
         key,err := parseConfigKey(keyName)
 		if err != nil {
 			return err
 		}
-		err = setKeyValuePairFromJson(ps,key,&element)
+		
+		err = setKeyValuePairFromJson(ctx,stack,ps,key,element)
         if err != nil {
 			return err
 		}
