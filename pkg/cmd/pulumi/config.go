@@ -599,6 +599,7 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 	var plaintextArgs []string
 	var secretArgs []string
 	var path bool
+	var rawJsonArgs string
 
 	setCmd := &cobra.Command{
 		Use:   "set-all --plaintext key1=value1 --plaintext key2=value2 --secret key3=value3",
@@ -620,6 +621,10 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 			opts := display.Options{
 				Color: cmdutil.GetGlobalColorization(),
 			}
+			hasTextArgs := len(plaintextArgs) > 0 || len(secretArgs) > 0 || path
+			if rawJsonArgs != "" && hasTextArgs {
+				return fmt.Errorf("cannot set config from json and text args simultaneously")
+			}
 
 			project, _, err := readProject()
 			if err != nil {
@@ -636,7 +641,15 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
+			configJsonValue, err := parseJsonConfig(rawJsonArgs)
+			if err != nil {
+				return err
+			} 
+			err = setConfigFromJsonValue(ps,configJsonValue)
+			if err != nil {
+				return err
+			}
+		
 			for _, ptArg := range plaintextArgs {
 				key, value, err := parseKeyValuePair(ptArg)
 				if err != nil {
@@ -684,8 +697,63 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 	setCmd.PersistentFlags().StringArrayVar(
 		&secretArgs, "secret", []string{},
 		"Marks a value as secret to be encrypted")
+	setCmd.PersistentFlags().StringVar(
+		&rawJsonArgs, "json", "",
+		"Parse the keys as from a json input")
 
 	return setCmd
+}
+
+func parseJsonConfig(jsonConfig string) (map[string]configValueJSON,error){
+	config := make(map[string]configValueJSON)
+	err := json.Unmarshal([]byte(jsonConfig),&config)
+	if err != nil {
+		return config,err
+	}
+	return config,nil
+}
+
+func setKeyValuePairFromJson(ps *workspace.ProjectStack,key config.Key,jsonValue *configValueJSON)(error){
+	var value config.Value 
+	if jsonValue.ObjectValue != nil {
+		if jsonValue.Secret {
+            value = config.NewSecureObjectValue(*jsonValue.Value)	
+		}else{
+			value = config.NewObjectValue(*jsonValue.Value)
+		}
+		err := ps.Config.Set(key,value,true)
+		if err != nil {
+					return err
+		}
+		return nil
+	}
+	
+	if jsonValue.Secret {
+		value = config.NewSecureValue(*jsonValue.Value)
+	}else{
+		value = config.NewValue(*jsonValue.Value)
+	}
+
+	err := ps.Config.Set(key,value,false)
+	if err != nil {
+			return err
+	}
+	return nil
+}
+
+func setConfigFromJsonValue(ps *workspace.ProjectStack,jsonValues map[string]configValueJSON) (error){
+	for keyName, element := range jsonValues {
+        key,err := parseConfigKey(keyName)
+		if err != nil {
+			return err
+		}
+		err = setKeyValuePairFromJson(ps,key,&element)
+        if err != nil {
+			return err
+		}
+    }
+
+	return nil
 }
 
 func parseKeyValuePair(pair string) (config.Key, string, error) {
