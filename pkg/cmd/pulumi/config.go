@@ -614,7 +614,10 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 			"  - `pulumi config set-all --path --plaintext parent.nested=value --plaintext parent.other=value2` \n" +
 			"    will set the value of `parent` to a map `{nested: value, other: value2}`.\n" +
 			"  - `pulumi config set-all --path --plaintext '[\"parent.name\"].[\"nested.name\"]'=value` will set the \n" +
-			"    value of `parent.name` to a map `nested.name: value`.",
+			"    value of `parent.name` to a map `nested.name: value`." +
+			"The --json flag can be used to set multiple configuration values from a json input, the json input musst be \n"+
+			"in the same format as the output of `pulumi config --json`. \n"+
+			"When using the --json flag it's not possible to use the --plaintext and --secret arguments",
 		Args: cmdutil.NoArgs,
 		Run: cmdutil.RunFunc(func(cmd *cobra.Command, args []string) error {
 			ctx := commandContext()
