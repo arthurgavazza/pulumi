@@ -644,6 +644,17 @@ func newConfigSetAllCmd(stack *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+<<<<<<< HEAD
+=======
+			configJsonValue, err := parseJsonConfig(rawJsonArgs)
+			if err != nil {
+				return err
+			} 
+			err = setConfigFromJsonValue(ps,configJsonValue)
+			if err != nil {
+				return err
+			}
+>>>>>>> a83a1b18d (feat: add json flag to config set all)
 		
 			for _, ptArg := range plaintextArgs {
 				key, value, err := parseKeyValuePair(ptArg)
@@ -722,6 +733,7 @@ func parseJsonConfig(jsonConfig string) (map[string]configValueJSON,error){
 	return config,nil
 }
 
+<<<<<<< HEAD
 func encryptValue(ctx context.Context, stack backend.Stack,value string)(string,error){
 	c, cerr := getStackEncrypter(stack)
 				if cerr != nil {
@@ -743,6 +755,13 @@ func setKeyValuePairFromJson(ctx context.Context, stack backend.Stack,ps *worksp
 				return err
 			}
             value = config.NewSecureObjectValue(enc)	
+=======
+func setKeyValuePairFromJson(ps *workspace.ProjectStack,key config.Key,jsonValue *configValueJSON)(error){
+	var value config.Value 
+	if jsonValue.ObjectValue != nil {
+		if jsonValue.Secret {
+            value = config.NewSecureObjectValue(*jsonValue.Value)	
+>>>>>>> a83a1b18d (feat: add json flag to config set all)
 		}else{
 			value = config.NewObjectValue(*jsonValue.Value)
 		}
@@ -754,6 +773,7 @@ func setKeyValuePairFromJson(ctx context.Context, stack backend.Stack,ps *worksp
 	}
 	
 	if jsonValue.Secret {
+<<<<<<< HEAD
 		enc,err := encryptValue(ctx,stack,*jsonValue.Value)
 			if err != nil {
 				return err
@@ -765,21 +785,40 @@ func setKeyValuePairFromJson(ctx context.Context, stack backend.Stack,ps *worksp
 	err := ps.Config.Set(key,value,false)
 	if err != nil {
 		return err
+=======
+		value = config.NewSecureValue(*jsonValue.Value)
+	}else{
+		value = config.NewValue(*jsonValue.Value)
+	}
+
+	err := ps.Config.Set(key,value,false)
+	if err != nil {
+			return err
+>>>>>>> a83a1b18d (feat: add json flag to config set all)
 	}
 	return nil
 }
 
+<<<<<<< HEAD
 func setConfigFromJsonValue(ctx context.Context, stack backend.Stack,ps *workspace.ProjectStack,jsonValues map[string]configValueJSON) (error){
 	for keyName, element := range jsonValues {
 		if element.Value == nil {
 			return fmt.Errorf("invalid json input, all config entries must have values")
 		}
+=======
+func setConfigFromJsonValue(ps *workspace.ProjectStack,jsonValues map[string]configValueJSON) (error){
+	for keyName, element := range jsonValues {
+>>>>>>> a83a1b18d (feat: add json flag to config set all)
         key,err := parseConfigKey(keyName)
 		if err != nil {
 			return err
 		}
+<<<<<<< HEAD
 		
 		err = setKeyValuePairFromJson(ctx,stack,ps,key,element)
+=======
+		err = setKeyValuePairFromJson(ps,key,&element)
+>>>>>>> a83a1b18d (feat: add json flag to config set all)
         if err != nil {
 			return err
 		}
